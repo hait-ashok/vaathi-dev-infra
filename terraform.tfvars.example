@@ -5,3 +5,7 @@ bucket_name          = "vaathi-dev-site-prod"
 github_org           = "hait-ashok"
 github_app_repo      = "vaathi.dev"
 github_deploy_branch = "main"
+
+# Account already has GitHub OIDC provider (hait H&A account):
+create_github_oidc_provider = false
+github_oidc_provider_arn    = "arn:aws:iam::827604626794:oidc-provider/token.actions.githubusercontent.com"

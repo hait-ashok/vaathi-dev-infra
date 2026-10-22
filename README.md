@@ -55,19 +55,23 @@ terraform init -backend-config=backend.hcl
 
 ### 2) Site apply order (DNS-aware)
 
-ACM DNS validation is checked on **public** DNS. Create the hosted zone first, point GoDaddy at the NS, then finish the stack.
+ACM DNS validation is checked on **public** DNS. Zone + ACM validation records can exist first; **CloudFront waits until GoDaddy points NS at Route 53**.
 
 ```bash
-cp terraform.tfvars.example terraform.tfvars   # edit if needed
+cp terraform.tfvars.example terraform.tfvars   # includes existing OIDC provider ARN for H&A account
 
-# Hosted zone only → copy NS to GoDaddy
+# Prefer native darwin_arm64 terraform on Apple Silicon (Rosetta x86 provider can time out)
 terraform apply -target=aws_route53_zone.site
 terraform output route53_name_servers
-# GoDaddy → nameservers → paste the 4 AWS NS values; wait for dig NS vaathi.dev
+# → GoDaddy custom nameservers (see Project store docs/go-live-outputs.md)
+# Wait: dig NS vaathi.dev +short
 
-# Full site stack (ACM, CloudFront, site S3, OIDC role, …)
-terraform apply
+# Finish ACM validation + CloudFront + aliases + bucket/role policies
+terraform apply -auto-approve
+terraform output -json github_actions_vars
 ```
+
+**Partial apply (2026-10-22):** zone, site bucket, ACM (PENDING_VALIDATION), deploy role, CF function/OAC/headers are live. Re-run `terraform apply` after NS cutover.
 
 If the account already has `token.actions.githubusercontent.com` OIDC provider:
 
