@@ -72,8 +72,8 @@ resource "aws_cloudfront_distribution" "site" {
     cached_methods         = ["GET", "HEAD"]
     compress               = true
 
-    # Managed CachingOptimized — fine for hashed /_astro assets; HTML invalidated on deploy.
-    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e82155d5c4f"
+    # Managed CachingOptimized (account-listed managed policy id)
+    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
     response_headers_policy_id = aws_cloudfront_response_headers_policy.site.id
 
     function_association {
