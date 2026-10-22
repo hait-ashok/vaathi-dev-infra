@@ -1,5 +1,4 @@
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfvars
@@ -11,3 +10,4 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 .DS_Store
+backend.hcl
