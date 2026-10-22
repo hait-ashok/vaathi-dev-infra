@@ -1,0 +1,7 @@
+aws_region           = "eu-west-2"
+project              = "vaathi.dev"
+domain_name          = "vaathi.dev"
+bucket_name          = "vaathi-dev-site-prod"
+github_org           = "hait-ashok"
+github_app_repo      = "vaathi.dev"
+github_deploy_branch = "main"

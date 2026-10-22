@@ -1,0 +1,13 @@
+# Optional S3 backend — create the bucket once (manual or bootstrap), then:
+#   cp backend.hcl.example backend.hcl
+#   # edit key/region/bucket
+#   # uncomment backend "s3" {} in versions.tf
+#   terraform init -backend-config=backend.hcl
+#
+# Until then, local terraform.tfstate is fine for first apply (back it up).
+
+bucket         = "vaathi-dev-tfstate"
+key            = "prod/terraform.tfstate"
+region         = "eu-west-2"
+encrypt        = true
+dynamodb_table = "vaathi-dev-tf-locks"

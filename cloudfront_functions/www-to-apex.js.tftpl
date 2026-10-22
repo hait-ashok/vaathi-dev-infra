@@ -1,0 +1,39 @@
+function handler(event) {
+  var request = event.request;
+  var hostHeader = request.headers.host;
+  var host = hostHeader && hostHeader.value ? hostHeader.value.toLowerCase() : '';
+  var apex = '${apex}';
+  var www = '${www}';
+
+  if (host === www || host.indexOf('www.') === 0) {
+    var location = 'https://' + apex + request.uri;
+    var qs = [];
+    if (request.querystring) {
+      for (var key in request.querystring) {
+        if (!Object.prototype.hasOwnProperty.call(request.querystring, key)) continue;
+        var item = request.querystring[key];
+        if (item.multiValue) {
+          for (var i = 0; i < item.multiValue.length; i++) {
+            qs.push(encodeURIComponent(key) + '=' + encodeURIComponent(item.multiValue[i].value));
+          }
+        } else if (item.value !== undefined) {
+          qs.push(encodeURIComponent(key) + '=' + encodeURIComponent(item.value));
+        } else {
+          qs.push(encodeURIComponent(key));
+        }
+      }
+    }
+    if (qs.length > 0) {
+      location += '?' + qs.join('&');
+    }
+    return {
+      statusCode: 301,
+      statusDescription: 'Moved Permanently',
+      headers: {
+        location: { value: location }
+      }
+    };
+  }
+
+  return request;
+}
