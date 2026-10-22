@@ -73,13 +73,14 @@ In **app** repo → Settings → Secrets and variables → Actions → **Variabl
 
 Do **not** leave apex A records at GoDaddy pointing elsewhere once NS are AWS — DNS is fully at Route 53 after cutover.
 
-## GitHub remote (when ready)
+## GitHub
+
+- **Repo:** https://github.com/hait-ashok/vaathi-dev-infra (`main` tracking `origin`)
+- **App repo:** https://github.com/hait-ashok/vaathi.dev
+- **Project group:** GitHub Organization create isn’t available from this CLI token. Use a [Projects v2](https://github.com/users/hait-ashok/projects) board titled **vaathi.dev** and link both repos (Settings → Linked repositories), or run after `gh auth refresh -s project,read:project`:
 
 ```bash
-# confirm login
-gh api user --jq .login
-
-gh repo create hait-ashok/vaathi-dev-infra --public --source=~/vaathi-dev-infra --remote=origin --push
+gh project create --owner hait-ashok --title "vaathi.dev"
+gh project link <number> --owner hait-ashok --repo hait-ashok/vaathi.dev
+gh project link <number> --owner hait-ashok --repo hait-ashok/vaathi-dev-infra
 ```
-
-Adjust owner if `gh api user` differs from `hait-ashok`.
