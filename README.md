@@ -14,41 +14,72 @@ App content lives in a separate repo (`vaathi.dev`). This repo never builds Astr
 ## Prerequisites
 
 - Terraform ≥ 1.5
-- AWS credentials for the H&A account (`aws sts get-caller-identity` must work)
+- AWS credentials for the H&A account (`AWS_PROFILE=hait aws sts get-caller-identity` must work)
 - GitHub app repo (default trust: `hait-ashok/vaathi.dev` on `main`)
 
-## Apply order (important)
+## Terraform state (S3 + DynamoDB)
+
+Remote state is **not in git**. Bootstrap creates:
+
+| Resource | Default name |
+| --- | --- |
+| S3 bucket (versioned, SSE-S3, public access blocked) | `vaathi-dev-tfstate` |
+| DynamoDB lock table (`LockID`) | `vaathi-dev-tf-locks` |
+| State object key (main stack) | `vaathi-dev/terraform.tfstate` |
+| Region | `eu-west-2` |
+
+Bootstrap uses **local state** once under `bootstrap/` (gitignored `*.tfstate*`). See [`bootstrap/README.md`](./bootstrap/README.md).
+
+### 0) Bootstrap state backend
+
+```bash
+cd ~/vaathi-dev-infra
+export AWS_PROFILE=hait   # H&A account
+
+cd bootstrap
+terraform init
+terraform apply
+cd ..
+
+terraform -chdir=bootstrap output -raw backend_hcl_snippet > backend.hcl   # gitignored
+```
+
+### 1) Init main stack against remote state
+
+```bash
+cd ~/vaathi-dev-infra
+export AWS_PROFILE=hait
+terraform init -backend-config=backend.hcl
+# If you had a previous local terraform.tfstate, answer yes to migrate.
+```
+
+### 2) Site apply order (DNS-aware)
 
 ACM DNS validation is checked on **public** DNS. Create the hosted zone first, point GoDaddy at the NS, then finish the stack.
 
 ```bash
-cd ~/vaathi-dev-infra
 cp terraform.tfvars.example terraform.tfvars   # edit if needed
-terraform init
 
-# 1) Hosted zone only → copy NS to GoDaddy
+# Hosted zone only → copy NS to GoDaddy
 terraform apply -target=aws_route53_zone.site
-
 terraform output route53_name_servers
-# At GoDaddy: Domain → DNS / Nameservers → custom → paste the 4 AWS NS values
-# Wait until dig NS vaathi.dev shows those servers (often 15–60+ minutes)
+# GoDaddy → nameservers → paste the 4 AWS NS values; wait for dig NS vaathi.dev
 
-# 2) Full stack (ACM validation, CloudFront, S3, OIDC role, …)
+# Full site stack (ACM, CloudFront, site S3, OIDC role, …)
 terraform apply
 ```
-
-**State:** default is **local** `terraform.tfstate` (fine for first apply — commit is gitignored; back up the file). Optional S3 backend: see `backend.hcl.example`, uncomment `backend "s3" {}` in `versions.tf`, then `terraform init -backend-config=backend.hcl`.
 
 If the account already has `token.actions.githubusercontent.com` OIDC provider:
 
 ```hcl
+# terraform.tfvars
 create_github_oidc_provider = false
 github_oidc_provider_arn    = "arn:aws:iam::ACCOUNT:oidc-provider/token.actions.githubusercontent.com"
 ```
 
 ## Outputs → GitHub Actions (app repo)
 
-After apply:
+After site apply:
 
 ```bash
 terraform output -json github_actions_vars
@@ -66,21 +97,13 @@ In **app** repo → Settings → Secrets and variables → Actions → **Variabl
 ## GoDaddy checklist
 
 1. Apply targeted zone; note `route53_name_servers`.
-2. GoDaddy → domain `vaathi.dev` → nameservers → replace with the four AWS values (not “forward only” records).
+2. GoDaddy → domain `vaathi.dev` → nameservers → replace with the four AWS values.
 3. Wait for NS propagation.
-4. `terraform apply` (full).
-5. Smoke: `https://vaathi.dev`, `https://www.vaathi.dev` (should 301 to apex).
-
-Do **not** leave apex A records at GoDaddy pointing elsewhere once NS are AWS — DNS is fully at Route 53 after cutover.
+4. `terraform apply` (full site).
+5. Smoke: `https://vaathi.dev`, `https://www.vaathi.dev` (301 to apex).
 
 ## GitHub
 
-- **Repo:** https://github.com/hait-ashok/vaathi-dev-infra (`main` tracking `origin`)
+- **Repo:** https://github.com/hait-ashok/vaathi-dev-infra
 - **App repo:** https://github.com/hait-ashok/vaathi.dev
-- **Project group:** GitHub Organization create isn’t available from this CLI token. Use a [Projects v2](https://github.com/users/hait-ashok/projects) board titled **vaathi.dev** and link both repos (Settings → Linked repositories), or run after `gh auth refresh -s project,read:project`:
-
-```bash
-gh project create --owner hait-ashok --title "vaathi.dev"
-gh project link <number> --owner hait-ashok --repo hait-ashok/vaathi.dev
-gh project link <number> --owner hait-ashok --repo hait-ashok/vaathi-dev-infra
-```
+- **Project:** https://github.com/users/hait-ashok/projects/1

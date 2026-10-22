@@ -8,9 +8,8 @@ terraform {
     }
   }
 
-  # Optional remote state — see backend.hcl.example and README.
-  # Uncomment after creating the state bucket, then:
+  # Partial S3 backend — pass the rest via backend.hcl (gitignored):
   #   terraform init -backend-config=backend.hcl
-  #
-  # backend "s3" {}
+  # Create bucket + lock table first: see bootstrap/
+  backend "s3" {}
 }
