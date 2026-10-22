@@ -35,5 +35,13 @@ function handler(event) {
     };
   }
 
+  // Astro MPA on S3+OAC: map directory URLs to index.html
+  var uri = request.uri;
+  if (uri.endsWith('/')) {
+    request.uri = uri + 'index.html';
+  } else if (uri.indexOf('.') === -1) {
+    request.uri = uri + '/index.html';
+  }
+
   return request;
 }
