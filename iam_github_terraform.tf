@@ -83,21 +83,13 @@ data "aws_iam_policy_document" "github_terraform" {
   }
 
   # --- Site origin bucket ---
+  # Full s3:* on this bucket: Terraform refresh reads attributes whose IAM
+  # names are not under GetBucket* (e.g. s3:GetAccelerateConfiguration).
   statement {
     sid    = "SiteBucket"
     effect = "Allow"
     actions = [
-      "s3:CreateBucket",
-      "s3:DeleteBucket",
-      "s3:GetBucket*",
-      "s3:ListBucket*",
-      "s3:PutBucket*",
-      "s3:DeleteBucket*",
-      "s3:GetObject*",
-      "s3:PutObject*",
-      "s3:DeleteObject*",
-      "s3:AbortMultipartUpload",
-      "s3:ListMultipartUploadParts",
+      "s3:*",
     ]
     resources = [
       aws_s3_bucket.site.arn,
