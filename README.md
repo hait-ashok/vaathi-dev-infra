@@ -107,15 +107,15 @@ In **app** repo → Settings → Secrets and variables → Actions → **Variabl
 4. `terraform apply` (full site).
 5. Smoke: `https://vaathi.dev`, `https://www.vaathi.dev` (301 to apex).
 
-## Terraform CI (Phase A — plan only)
+## Terraform CI (Phase B — plan + gated apply)
 
 GitHub Actions workflow [`.github/workflows/terraform.yml`](./.github/workflows/terraform.yml):
 
 - **PR → `main`:** `fmt` → `validate` → `plan` → PR comment + artifact
-- **Push → `main`:** same plan path (no apply job yet)
-- **Apply:** still local with `AWS_PROFILE=hait` until Phase B
+- **Push → `main` / `workflow_dispatch`:** Apply job behind Environment **`terraform`** (required reviewers). After H&A **approves the Environment deployment** in the Actions run, CI re-plans and `terraform apply`s that plan.
 - **Auth:** OIDC role `vaathi-dev-github-terraform` (not the app deploy role)
 - **Backend:** committed [`backend.hcl`](./backend.hcl) (bucket/key/table names only)
+- **Local apply** still available with `AWS_PROFILE=hait` for destroy / one-offs / timing-sensitive DNS
 
 Infra repo → Settings → Secrets and variables → Actions → **Variables**:
 
@@ -124,7 +124,10 @@ Infra repo → Settings → Secrets and variables → Actions → **Variables**:
 | `AWS_REGION` | `eu-west-2` |
 | `AWS_TERRAFORM_ROLE_ARN` | `terraform output -raw github_terraform_role_arn` |
 
-Fork PRs skip AWS. Terraform pin: **1.5.7**.
+Environment **`terraform`**: required reviewer `hait-ashok`; deployment branches = `main` only.  
+Settings → Environments → [terraform](https://github.com/hait-ashok/vaathi-dev-infra/settings/environments).
+
+Fork PRs skip AWS. Terraform pin: **1.5.7**. Concurrency group `terraform-prod` with `cancel-in-progress: false` (do not cancel mid-apply).
 
 ## GitHub
 
