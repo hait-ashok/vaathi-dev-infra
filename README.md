@@ -15,7 +15,7 @@ App content lives in a separate repo (`vaathi.dev`). This repo never builds Astr
 
 - Terraform ≥ 1.5
 - AWS credentials for the H&A account (`AWS_PROFILE=hait aws sts get-caller-identity` must work)
-- GitHub app repo (default trust: `hait-ashok/vaathi.dev` on `main`)
+- GitHub app repo (default trust: immutable OIDC sub for `hait-ashok/vaathi.dev` on `main`, with owner/repo numeric IDs)
 
 ## Terraform state (S3 + DynamoDB)
 

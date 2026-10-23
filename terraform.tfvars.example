@@ -3,7 +3,9 @@ project              = "vaathi.dev"
 domain_name          = "vaathi.dev"
 bucket_name          = "vaathi-dev-site-prod"
 github_org           = "hait-ashok"
+github_org_id        = "95386057"   # numeric owner id (immutable OIDC sub)
 github_app_repo      = "vaathi.dev"
+github_repo_id       = "1429966728" # numeric repo id (immutable OIDC sub)
 github_deploy_branch = "main"
 
 # Account already has GitHub OIDC provider (hait H&A account):
