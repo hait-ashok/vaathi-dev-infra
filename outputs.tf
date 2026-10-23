@@ -48,3 +48,24 @@ output "github_actions_vars" {
     AWS_CLOUDFRONT_DISTRIBUTION_ID = aws_cloudfront_distribution.site.id
   }
 }
+
+output "github_terraform_role_arn" {
+  description = "GitHub Actions var (infra repo): AWS_TERRAFORM_ROLE_ARN"
+  value       = aws_iam_role.github_terraform.arn
+}
+
+output "github_terraform_oidc_subjects" {
+  description = "Subject claims required on the terraform role trust policy."
+  value = {
+    main         = local.github_terraform_sub_main
+    pull_request = local.github_terraform_sub_pr
+  }
+}
+
+output "github_actions_infra_vars" {
+  description = "Copy into the infra repo Settings → Secrets and variables → Actions → Variables"
+  value = {
+    AWS_REGION             = var.aws_region
+    AWS_TERRAFORM_ROLE_ARN = aws_iam_role.github_terraform.arn
+  }
+}

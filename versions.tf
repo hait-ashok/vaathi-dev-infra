@@ -8,7 +8,7 @@ terraform {
     }
   }
 
-  # Partial S3 backend — pass the rest via backend.hcl (gitignored):
+  # Partial S3 backend — pass the rest via committed backend.hcl:
   #   terraform init -backend-config=backend.hcl
   # Create bucket + lock table first: see bootstrap/
   backend "s3" {}

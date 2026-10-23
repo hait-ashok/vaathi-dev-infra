@@ -10,4 +10,4 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 .DS_Store
-backend.hcl
+# backend.hcl is committed for CI (non-secret bucket/key/table names).

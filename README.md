@@ -41,7 +41,8 @@ terraform init
 terraform apply
 cd ..
 
-terraform -chdir=bootstrap output -raw backend_hcl_snippet > backend.hcl   # gitignored
+# backend.hcl is committed for CI; regenerate from bootstrap if names change:
+# terraform -chdir=bootstrap output -raw backend_hcl_snippet > backend.hcl
 ```
 
 ### 1) Init main stack against remote state
@@ -105,6 +106,25 @@ In **app** repo → Settings → Secrets and variables → Actions → **Variabl
 3. Wait for NS propagation.
 4. `terraform apply` (full site).
 5. Smoke: `https://vaathi.dev`, `https://www.vaathi.dev` (301 to apex).
+
+## Terraform CI (Phase A — plan only)
+
+GitHub Actions workflow [`.github/workflows/terraform.yml`](./.github/workflows/terraform.yml):
+
+- **PR → `main`:** `fmt` → `validate` → `plan` → PR comment + artifact
+- **Push → `main`:** same plan path (no apply job yet)
+- **Apply:** still local with `AWS_PROFILE=hait` until Phase B
+- **Auth:** OIDC role `vaathi-dev-github-terraform` (not the app deploy role)
+- **Backend:** committed [`backend.hcl`](./backend.hcl) (bucket/key/table names only)
+
+Infra repo → Settings → Secrets and variables → Actions → **Variables**:
+
+| Variable | Value |
+| --- | --- |
+| `AWS_REGION` | `eu-west-2` |
+| `AWS_TERRAFORM_ROLE_ARN` | `terraform output -raw github_terraform_role_arn` |
+
+Fork PRs skip AWS. Terraform pin: **1.5.7**.
 
 ## GitHub
 
