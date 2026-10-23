@@ -1,6 +1,6 @@
-# Copy to backend.hcl (gitignored) after bootstrap apply:
+# Reference / bootstrap snippet. Committed backend.hcl matches these values for CI.
+# After bootstrap apply you can regenerate with:
 #   terraform -chdir=bootstrap output -raw backend_hcl_snippet > backend.hcl
-# Or fill manually to match bootstrap defaults.
 
 bucket         = "vaathi-dev-tfstate"
 key            = "vaathi-dev/terraform.tfstate"

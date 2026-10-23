@@ -52,6 +52,36 @@ variable "github_deploy_branch" {
   default     = "main"
 }
 
+variable "github_infra_repo" {
+  description = "Infra repository name trusted for Terraform via OIDC."
+  type        = string
+  default     = "vaathi-dev-infra"
+}
+
+variable "github_infra_repo_id" {
+  description = "Numeric GitHub infra repository ID for immutable OIDC sub (repo@id)."
+  type        = string
+  default     = ""
+}
+
+variable "github_infra_branch" {
+  description = "Git branch allowed to assume the terraform role for apply/main-push subjects."
+  type        = string
+  default     = "main"
+}
+
+variable "tfstate_bucket_name" {
+  description = "S3 bucket holding Terraform remote state (bootstrap)."
+  type        = string
+  default     = "vaathi-dev-tfstate"
+}
+
+variable "tf_locks_table_name" {
+  description = "DynamoDB table for Terraform state locks (bootstrap)."
+  type        = string
+  default     = "vaathi-dev-tf-locks"
+}
+
 variable "create_github_oidc_provider" {
   description = "Set false and pass github_oidc_provider_arn if the account already has the GitHub OIDC provider."
   type        = bool

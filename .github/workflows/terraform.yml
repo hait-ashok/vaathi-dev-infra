@@ -1,0 +1,106 @@
+# Phase A: plan-only Terraform CI (apply stays local with AWS_PROFILE=hait).
+name: Terraform
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_VERSION: "1.5.7"
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    # Fork PRs cannot assume our OIDC role; skip AWS entirely.
+    if: >
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      # terraform.tfvars is gitignored; example holds non-secret H&A account values for CI.
+      - name: Use example tfvars for CI
+        run: cp terraform.tfvars.example terraform.tfvars
+
+      - name: Terraform init
+        run: terraform init -input=false -backend-config=backend.hcl
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          set -euo pipefail
+          terraform plan -input=false -out=tfplan -no-color 2>&1 | tee plan.txt
+          terraform show -no-color tfplan > plan-show.txt
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: |
+            tfplan
+            plan.txt
+            plan-show.txt
+          retention-days: 14
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = fs.readFileSync('plan-show.txt', 'utf8');
+            const max = 60000;
+            if (body.length > max) {
+              body = body.slice(0, max) + '\n\n… truncated (see workflow artifact `tfplan`).\n';
+            }
+            const marker = '<!-- terraform-plan -->';
+            const comment = `${marker}\n### Terraform plan\n\`\`\`\n${body}\n\`\`\`\n`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find(c => c.user?.type === 'Bot' && c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body: comment,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body: comment,
+              });
+            }
