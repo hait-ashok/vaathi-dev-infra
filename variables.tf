@@ -28,10 +28,22 @@ variable "github_org" {
   default     = "hait-ashok"
 }
 
+variable "github_org_id" {
+  description = "Numeric GitHub owner ID for immutable OIDC sub (owner@id). Required for repos created after 2026-07-15 or with use_immutable_subject."
+  type        = string
+  default     = ""
+}
+
 variable "github_app_repo" {
   description = "App repository name (static site) trusted for deploy via OIDC."
   type        = string
   default     = "vaathi.dev"
+}
+
+variable "github_repo_id" {
+  description = "Numeric GitHub repository ID for immutable OIDC sub (repo@id)."
+  type        = string
+  default     = ""
 }
 
 variable "github_deploy_branch" {
