@@ -129,8 +129,26 @@ Settings → Environments → [terraform](https://github.com/hait-ashok/vaathi-d
 
 Fork PRs skip AWS. Terraform pin: **1.5.7**. Concurrency group `terraform-prod` with `cancel-in-progress: false` (do not cancel mid-apply).
 
+## Sandbox Lambda (Bedrock + access requests)
+
+CLI-managed (not Terraform yet). From this repo:
+
+```bash
+export AWS_PROFILE=hait
+# Optional: grant /sandbox/admin (must already exist in Cognito with TOTP)
+export SANDBOX_ADMIN_EMAIL=you@example.com
+./cognito/deploy-cognito.sh          # once — user pool + app client
+./lambda/sandbox/deploy.sh           # ledger + access table + Function URL + PreSignUp
+```
+
+- **Access table** `vaathi-sandbox-access` — pending / approved / denied by email
+- **PreSignUp** Lambda `vaathi-sandbox-presignup` — blocks Cognito register unless approved
+- **Admin group** `sandbox-admin` — required for `GET /access-requests` and `POST /access-decide`
+- Existing Cognito users are seeded as **approved** on each deploy (does not overwrite pending/denied)
+
 ## GitHub
 
 - **Repo:** https://github.com/hait-ashok/vaathi-dev-infra
 - **App repo:** https://github.com/hait-ashok/vaathi.dev
 - **Project:** https://github.com/users/hait-ashok/projects/1
+
