@@ -81,11 +81,20 @@ def _response_headers() -> dict[str, str]:
     }
 
 
+def _json_default(value: Any) -> Any:
+    if isinstance(value, Decimal):
+        # DynamoDB numbers come back as Decimal — emit int when whole, else float.
+        if value % 1 == 0:
+            return int(value)
+        return float(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 def _response(status: int, body: dict[str, Any], origin: str | None = None) -> dict[str, Any]:
     return {
         "statusCode": status,
         "headers": _response_headers(),
-        "body": json.dumps(body),
+        "body": json.dumps(body, default=_json_default),
     }
 
 
@@ -442,12 +451,20 @@ def _handle_list_access(origin: str | None, admin_email: str) -> dict[str, Any]:
         reverse=True,
     )[:50]
 
+    def as_int(v: Any) -> int | None:
+        if v is None or v == "":
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
     def public_item(i: dict[str, Any]) -> dict[str, Any]:
         return {
             "email": i.get("email"),
             "status": i.get("status"),
-            "requestedAt": i.get("requestedAt"),
-            "decidedAt": i.get("decidedAt"),
+            "requestedAt": as_int(i.get("requestedAt")),
+            "decidedAt": as_int(i.get("decidedAt")),
             "decidedBy": i.get("decidedBy"),
         }
 
