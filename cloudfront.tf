@@ -36,8 +36,8 @@ resource "aws_cloudfront_response_headers_policy" "site" {
     }
 
     content_security_policy {
-      # Light CSP — allow Google Fonts used by the Astro layout; tighten later.
-      content_security_policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+      # Light CSP — Google Fonts for Astro layout; OpenAI for Sandbox BYOK (temporary until Bedrock).
+      content_security_policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self' https://api.openai.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
       override                = true
     }
   }
