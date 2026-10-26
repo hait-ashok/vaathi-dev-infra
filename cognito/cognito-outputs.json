@@ -1,0 +1,6 @@
+{
+  "region": "eu-west-2",
+  "userPoolId": "eu-west-2_DaGU8hhWE",
+  "clientId": "54cailktia06nio1vk7jtog1uu",
+  "cognitoIdpEndpoint": "https://cognito-idp.eu-west-2.amazonaws.com/"
+}

@@ -37,7 +37,7 @@ resource "aws_cloudfront_response_headers_policy" "site" {
 
     content_security_policy {
       # Google Fonts + Sandbox Lambda Function URL (Bedrock). No public model APIs from the browser.
-      content_security_policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self' https://ctdfwx564hs55z6rht6c7dj43q0ewmps.lambda-url.eu-west-2.on.aws; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+      content_security_policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self' https://ctdfwx564hs55z6rht6c7dj43q0ewmps.lambda-url.eu-west-2.on.aws https://cognito-idp.eu-west-2.amazonaws.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
       override                = true
     }
   }
