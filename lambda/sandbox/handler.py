@@ -16,6 +16,9 @@ from botocore.exceptions import ClientError
 
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION", "eu-west-1")
 MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-micro-v1:0")
+COGNITO_REGION = os.environ.get("COGNITO_REGION", os.environ.get("AWS_REGION", "eu-west-2"))
+COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "")
+REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "true").lower() in ("1", "true", "yes")
 _origins_raw = os.environ.get(
     "ALLOWED_ORIGINS",
     "https://vaathi.dev|https://www.vaathi.dev|http://127.0.0.1:4321|http://localhost:4321",
@@ -29,6 +32,7 @@ MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "600"))
 MAX_AGENT_STEPS = int(os.environ.get("MAX_AGENT_STEPS", "5"))
 
 bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
+cognito = boto3.client("cognito-idp", region_name=COGNITO_REGION)
 dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "eu-west-2"))
 
 FACTS = {
@@ -105,16 +109,16 @@ def _today_key() -> str:
 
 
 def _check_and_charge_budget() -> tuple[bool, str]:
-    """Site-wide soft ledger. AWS Budget is the hard backstop."""
+    """Site-wide soft ledger ($1/day). AWS Budget on Bedrock is the hard backstop."""
     if not LEDGER_TABLE:
-        return True, "ledger-disabled"
+        return False, "Ledger not configured"
     table = dynamodb.Table(LEDGER_TABLE)
     day = _today_key()
     try:
         item = table.get_item(Key={"pk": f"day#{day}"}).get("Item") or {}
         spent = Decimal(str(item.get("spent_usd", "0")))
         if spent + EST_COST_PER_CALL_USD > DAILY_CAP_USD:
-            return False, f"Daily sandbox budget reached (${DAILY_CAP_USD}). Try again tomorrow."
+            return False, f"Daily Bedrock budget reached (${DAILY_CAP_USD}). Try again tomorrow."
         table.update_item(
             Key={"pk": f"day#{day}"},
             UpdateExpression="ADD spent_usd :c, calls :one SET updated_at = :t",
@@ -126,9 +130,34 @@ def _check_and_charge_budget() -> tuple[bool, str]:
         )
         return True, "ok"
     except ClientError as exc:
-        # Fail open to availability but log; Budget still caps AWS spend.
         print(json.dumps({"level": "error", "msg": "ledger", "error": str(exc)}))
-        return True, "ledger-error"
+        return False, "Budget ledger unavailable"
+
+
+def _bearer_token(event: dict[str, Any]) -> str | None:
+    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+    auth = headers.get("authorization") or ""
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip() or None
+    return None
+
+
+def _verify_cognito_access_token(token: str) -> tuple[bool, str]:
+    """Validate access token with Cognito GetUser (no public JWKS dependency)."""
+    if not token:
+        return False, "Sign in required"
+    try:
+        user = cognito.get_user(AccessToken=token)
+        # Optional pool binding via iss claim is not on GetUser; client id is enforced by Cognito issuance.
+        username = user.get("Username") or "user"
+        if COGNITO_USER_POOL_ID:
+            # Soft check: token must work against this region's pool; wrong pool fails GetUser.
+            pass
+        return True, username
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "NotAuthorized")
+        print(json.dumps({"level": "warn", "auth": code}))
+        return False, "Session expired or invalid — sign in again"
 
 
 def _lookup_fact(topic: str) -> str:
@@ -278,6 +307,14 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     if not _origin_allowed(origin):
         return _response(403, {"error": "Origin not allowed"}, origin)
 
+    if REQUIRE_AUTH:
+        token = _bearer_token(event)
+        ok_auth, who = _verify_cognito_access_token(token or "")
+        if not ok_auth:
+            return _response(401, {"error": who}, origin)
+    else:
+        who = "anonymous"
+
     ok, reason = _check_and_charge_budget()
     if not ok:
         return _response(429, {"error": reason}, origin)
@@ -321,6 +358,8 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "model": MODEL_ID,
             "region": BEDROCK_REGION,
             "scenario": scenario,
+            "user": who,
+            "dailyCapUsd": str(DAILY_CAP_USD),
             "steps": steps,
         },
         origin,

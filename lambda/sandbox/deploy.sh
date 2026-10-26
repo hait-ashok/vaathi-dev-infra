@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy Sandbox Lambda (Bedrock) — AWS network only.
+# Deploy Sandbox Lambda (Bedrock + Cognito JWT gate) — AWS network only.
 set -euo pipefail
 export AWS_PROFILE="${AWS_PROFILE:-hait}"
 REGION_SITE="${REGION_SITE:-eu-west-2}"
@@ -10,8 +10,16 @@ ROLE_NAME="vaathi-sandbox-lambda"
 TABLE="vaathi-sandbox-ledger"
 MODEL_ID="eu.amazon.nova-micro-v1:0"
 DIR="$(cd "$(dirname "$0")" && pwd)"
+COGNITO_JSON="${DIR}/../../cognito/cognito-outputs.json"
 
 echo "Account $ACCOUNT · Lambda in $REGION_SITE · Bedrock $REGION_BEDROCK"
+
+if [[ ! -f "$COGNITO_JSON" ]]; then
+  echo "Missing $COGNITO_JSON — run cognito/deploy-cognito.sh first" >&2
+  exit 1
+fi
+COGNITO_POOL_ID="$(/usr/bin/python3 -c "import json;print(json.load(open('$COGNITO_JSON'))['userPoolId'])")"
+COGNITO_REGION="$(/usr/bin/python3 -c "import json;print(json.load(open('$COGNITO_JSON'))['region'])")"
 
 # IAM role
 if ! aws iam get-role --role-name "$ROLE_NAME" &>/dev/null; then
@@ -44,6 +52,12 @@ cat >/tmp/vaathi-sandbox-policy.json <<EOF
       "Effect": "Allow",
       "Action": ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:PutItem"],
       "Resource": "arn:aws:dynamodb:${REGION_SITE}:${ACCOUNT}:table/${TABLE}"
+    },
+    {
+      "Sid": "CognitoGetUser",
+      "Effect": "Allow",
+      "Action": ["cognito-idp:GetUser"],
+      "Resource": "*"
     }
   ]
 }
@@ -62,10 +76,8 @@ if ! aws dynamodb describe-table --table-name "$TABLE" --region "$REGION_SITE" &
 fi
 
 ROLE_ARN="$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text)"
-# IAM propagation
-sleep 8
+sleep 5
 
-# Package
 rm -f /tmp/vaathi-sandbox.zip
 ( cd "$DIR" && zip -q /tmp/vaathi-sandbox.zip handler.py )
 
@@ -76,6 +88,9 @@ cat >/tmp/vaathi-sandbox-env.json <<EOF
     "BEDROCK_MODEL_ID": "${MODEL_ID}",
     "LEDGER_TABLE": "${TABLE}",
     "DAILY_CAP_USD": "1.0",
+    "REQUIRE_AUTH": "true",
+    "COGNITO_REGION": "${COGNITO_REGION}",
+    "COGNITO_USER_POOL_ID": "${COGNITO_POOL_ID}",
     "ALLOWED_ORIGINS": "https://vaathi.dev|https://www.vaathi.dev|http://127.0.0.1:4321|http://localhost:4321"
   }
 }
@@ -97,14 +112,16 @@ else
   aws lambda wait function-active --function-name "$FN_NAME" --region "$REGION_SITE"
 fi
 
-# Function URL + CORS
+# Function URL CORS — allow Authorization for Cognito bearer tokens
+CORS='AllowOrigins=https://vaathi.dev,https://www.vaathi.dev,http://127.0.0.1:4321,http://localhost:4321,AllowMethods=POST,AllowHeaders=content-type,authorization,MaxAge=86400'
 if ! aws lambda get-function-url-config --function-name "$FN_NAME" --region "$REGION_SITE" &>/dev/null; then
   aws lambda create-function-url-config --function-name "$FN_NAME" --region "$REGION_SITE" \
-    --auth-type NONE \
-    --cors "AllowOrigins=https://vaathi.dev,https://www.vaathi.dev,http://127.0.0.1:4321,http://localhost:4321,AllowMethods=POST,AllowHeaders=content-type,MaxAge=86400" >/dev/null
+    --auth-type NONE --cors "$CORS" >/dev/null
+else
+  aws lambda update-function-url-config --function-name "$FN_NAME" --region "$REGION_SITE" \
+    --cors "$CORS" >/dev/null
 fi
 
-# Public invoke permission for Function URL (auth NONE)
 aws lambda add-permission --function-name "$FN_NAME" --region "$REGION_SITE" \
   --statement-id FunctionURLAllowPublicAccess \
   --action lambda:InvokeFunctionUrl \
@@ -117,4 +134,5 @@ aws lambda add-permission --function-name "$FN_NAME" --region "$REGION_SITE" \
 
 URL="$(aws lambda get-function-url-config --function-name "$FN_NAME" --region "$REGION_SITE" --query FunctionUrl --output text)"
 echo "FUNCTION_URL=$URL"
+echo "COGNITO_POOL=$COGNITO_POOL_ID"
 echo "$URL" > /tmp/vaathi-sandbox-url.txt
