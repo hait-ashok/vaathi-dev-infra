@@ -63,23 +63,19 @@ TOOL_CONFIG = {
 }
 
 
-def _cors_headers(origin: str | None) -> dict[str, str]:
-    allow = origin if origin in ALLOWED_ORIGINS else "https://vaathi.dev"
+def _response_headers() -> dict[str, str]:
+    # Do NOT set Access-Control-* here. Function URL Cors config already adds them.
+    # Duplicate ACAO headers make browsers fail with "Failed to fetch".
     return {
-        "Access-Control-Allow-Origin": allow,
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "content-type",
-        "Access-Control-Max-Age": "86400",
         "Content-Type": "application/json",
-        "Vary": "Origin",
         "Cache-Control": "no-store",
     }
 
 
-def _response(status: int, body: dict[str, Any], origin: str | None) -> dict[str, Any]:
+def _response(status: int, body: dict[str, Any], origin: str | None = None) -> dict[str, Any]:
     return {
         "statusCode": status,
-        "headers": _cors_headers(origin),
+        "headers": _response_headers(),
         "body": json.dumps(body),
     }
 
@@ -273,7 +269,8 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     method = (event.get("requestContext") or {}).get("http", {}).get("method") or event.get("httpMethod") or "POST"
 
     if method == "OPTIONS":
-        return {"statusCode": 204, "headers": _cors_headers(origin), "body": ""}
+        # Function URL handles CORS preflight; keep a cheap 204 if invoked.
+        return {"statusCode": 204, "headers": _response_headers(), "body": ""}
 
     if method != "POST":
         return _response(405, {"error": "Method not allowed"}, origin)
